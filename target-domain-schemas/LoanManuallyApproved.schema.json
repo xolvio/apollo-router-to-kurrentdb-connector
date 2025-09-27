@@ -1,0 +1,24 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "properties" : {
+    "LoanRequestID" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The ID for this loan request. Should be a UUID."
+    },
+    "ApproverName" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The name of the person whom made this approval decision."
+    },
+    "LoanManualDecisionTimestamp" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The timestamp at which this manual loan decision was made."
+    }
+  },
+  "required" : [ "LoanRequestID", "ApproverName", "LoanManualDecisionTimestamp" ],
+  "title" : "LoanManuallyApproved",
+  "description" : "Represents an event that a loan request has been approved manually."
+}

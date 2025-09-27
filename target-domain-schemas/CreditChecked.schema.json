@@ -1,0 +1,27 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "properties" : {
+    "NationalID" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The national identifier for the user.",
+      "minLength" : 1
+    },
+    "Score" : {
+      "type" : "integer",
+      "title" : "Integer",
+      "description" : "The credit check score.",
+      "minimum" : 0,
+      "maximum" : 9
+    },
+    "CreditCheckedTimestamp" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The timestamp at which this credit check was completed."
+    }
+  },
+  "required" : [ "NationalID", "Score", "CreditCheckedTimestamp" ],
+  "title" : "CreditChecked",
+  "description" : "Represents an event that a credit check has been performed."
+}

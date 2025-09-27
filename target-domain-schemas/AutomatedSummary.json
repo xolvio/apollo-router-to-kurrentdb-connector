@@ -1,0 +1,51 @@
+{
+    "$schema" : "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "AutomatedSummary",
+    "required": [
+        "CreditScoreSummary",
+        "IncomeAndEmploymentSummary",
+        "LoanToIncomeSummary",
+        "MaritalStatusSummary",
+        "RecommendedFurtherInvestigation",
+        "SummarizedBy",
+        "SummarizedAt"
+    ],
+    "properties": {
+        "CreditScoreSummary": {
+            "type": "string",
+            "title": "String",
+            "description": "A detailed summary of the supplied credit score"
+        },
+        "IncomeAndEmploymentSummary": {
+            "type": "string",
+            "title": "String",
+            "description": "A detailed summary of the supplied income and employment information"
+        },
+        "LoanToIncomeSummary": {
+            "type": "string",
+            "title": "String",
+            "description": "A detailed summary of a calculated loan to income ratio"
+        },
+        "MaritalStatusAndDependentsSummary": {
+            "type": "string",
+            "title": "String",
+            "description": "A detailed summary of the supplied marital status and number of dependents"
+        },
+        "RecommendedFurtherInvestigation": {
+            "type": "string",
+            "title": "String",
+            "description": "A detailed summary of other areas an underwriter should investigate further before approving or denying the loan"
+        },
+        "SummarizedBy": {
+            "type": "string",
+            "title": "String",
+            "description": "The details of the system that generated this automated summary"
+        },
+        "SummarizedAt": {
+            "type": "string",
+            "title": "String",
+            "description": "the timestamp when this automated summary was generated"
+        }
+    }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "properties" : {
+    "$correlationId" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The ID for this loan request stream. Should be a UUID."
+    },
+    "$causationId" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The UUID for the event that caused this event. Should be a UUID."
+    },
+    "transactionTimestamp" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The timestamp at which this event was created."
+    }
+  },
+  "required" : [ "$correlationId", "$causationId", "transactionTimestamp" ],
+  "title" : "Metadata",
+  "description" : "Metadata for all Loan Application events."
+}

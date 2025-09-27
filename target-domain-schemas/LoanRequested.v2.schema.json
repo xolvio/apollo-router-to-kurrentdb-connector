@@ -1,0 +1,173 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "properties" : {
+    "Amount" : {
+      "type" : "number",
+      "title" : "float",
+      "description" : "The amount of the loan request.",
+      "exclusiveMinimum" : 0
+    },
+    "LoanRequestID" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The ID for this loan request. Should be a UUID."
+    },
+    "NationalID" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The national identifier for the user.",
+      "minLength" : 1
+    },
+    "Name" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The name of the person making the loan request.",
+      "minLength" : 1
+    },
+    "Gender" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The gender of the person making the loan request.",
+      "enum": [
+        "Male",
+        "Female",
+        "Non Binary"
+      ]
+    },
+    "Age" : {
+      "type" : "number",
+      "title" : "integer",
+      "description" : "The age of the person making the loan request.",
+      "minLength" : 1
+    },
+    "MaritalStatus" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The marital status of the person making the loan request.",
+      "enum": [
+        "Married",
+        "Widowed",
+        "Divorced",
+        "Separated",
+        "Never married"
+      ]
+    },
+    "Dependents" : {
+      "type" : "number",
+      "title" : "integer",
+      "description" : "The number of dependents for the person making the loan request.",
+      "minLength" : 1
+    },
+    "LevelOfEducation" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The level of education of the person making the loan request.",
+      "enum": [
+        "No schooling completed",
+        "Nursery school",
+        "Kindergarten",
+        "Grade 1 though 11",
+        "12th grade - No Diploma",
+        "Regular high school diploma",
+        "GED or alternative credential",
+        "Some college",
+        "Associate's degree",
+        "Bachelor's degree",
+        "Master's degree",
+        "Professional degree",
+        "Doctorate degree"
+      ]
+    },
+    "EmployerName" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The name of the employer of the person making the loan request.",
+      "minLength" : 1
+    },
+    "JobTitle" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The job title of the person making the loan request.",
+      "minLength" : 1
+    },
+    "JobSeniority" : {
+      "type" : "number",
+      "title" : "float",
+      "description" : "The number of years of seniority of the person making the loan request.",
+      "minLength" : 1
+    },
+    "Income" : {
+      "type" : "number",
+      "title" : "float",
+      "description" : "The yearly income of the person making the loan request.",
+      "minLength" : 1
+    },
+    "Address" : {
+      "type": "object",
+      "description": "The address of the user making the loan request.",
+      "properties": {
+        "Street": {
+          "type": "string",
+          "title": "String",
+          "description": "The street address of the user making the loan request.",
+          "minLength": 1
+        },
+        "City": {
+          "type": "string",
+          "title": "String",
+          "description": "The city of the user making the loan request.",
+          "minLength": 1
+        },
+        "Region": {
+          "type": "string",
+          "title": "String",
+          "description": "The region of the user making the loan request.",
+          "minLength": 1
+        },
+        "Country": {
+          "type": "string",
+          "title": "String",
+          "description": "The country of the user making the loan request.",
+          "minLength": 1
+        },
+        "PostalCode": {
+          "type": "string",
+          "title": "String",
+          "description": "The postal code of the user making the loan request.",
+          "minLength": 1
+        }
+      },
+      "required": ["Street", "City", "Region", "Country","PostalCode"]
+    },
+    "LoanRequestedTimestamp" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The timestamp at which this loan request was made."
+    },
+    "LoanProductID": {
+      "type": "number",
+      "title": "integer",
+      "description": "The ID of the loan product for which the applicant is interested"
+    }
+  },
+  "required": [
+    "Amount",
+    "LoanRequestID",
+    "NationalID",
+    "Name",
+    "Gender",
+    "Age",
+    "MaritalStatus",
+    "Dependents",
+    "EducationLevel",
+    "EmployerName",
+    "JobSeniority",
+    "JobTitle",
+    "Income",
+    "Address",
+    "LoanRequestedTimestamp"
+  ],
+  "title" : "LoanRequested",
+  "description" : "Represents an event that a loan request has been created."
+}

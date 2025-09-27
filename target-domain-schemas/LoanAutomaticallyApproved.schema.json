@@ -1,0 +1,19 @@
+{
+  "$schema" : "http://json-schema.org/draft-07/schema#",
+  "type" : "object",
+  "properties" : {
+    "LoanRequestID" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The ID for this loan request. Should be a UUID."
+    },
+    "LoanAutomatedDecisionTimestamp" : {
+      "type" : "string",
+      "title" : "String",
+      "description" : "The timestamp at which this automated loan decision was made."
+    }
+  },
+  "required" : [ "LoanRequestID", "LoanAutomatedDecisionTimestamp" ],
+  "title" : "LoanAutomaticallyApproved",
+  "description" : "Represents an event that a loan request has been approved automatically."
+}

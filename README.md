@@ -8,9 +8,9 @@ This project scaffolds a custom Apollo Router binary named `starstuff` with a na
 
 ## Project Layout
 
-- `src/plugins/hello_world.rs` – simple `starstuff.hello_world` plugin that logs a configurable message when the router starts.
-- `router.yaml` – enables the plugin and provides its configuration stanza.
-- `supergraph-schema.graphql` – sample supergraph schema downloaded from `https://supergraph.demo.starstuff.dev/` for local runs.
+- `src/plugins/mutation_plugin.rs` – plugin that logs the mutations in the query.
+- `router.yaml` – enables the plugin and provides its configuration.
+- `supergraph-schema.graphql` – schema made according to schemas in the target-domain-schemas folder.
 
 ## Building
 
@@ -29,7 +29,7 @@ cargo run -- --hot-reload --config router.yaml --supergraph supergraph-schema.gr
 You should see a log entry similar to:
 
 ```
-INFO starstuff.hello_world plugin initialized message="starting my plugin"
+INFO starstuff.mutation_plugin plugin initialized message="starting my plugin"
 ```
 
 ## Modifying the Plugins

@@ -1,0 +1,362 @@
+schema
+  @link(url: "https://specs.apollo.dev/link/v1.0")
+  @link(url: "https://specs.apollo.dev/join/v0.3", for: EXECUTION)
+{
+  query: Query
+  mutation: Mutation
+}
+
+directive @join__enumValue(graph: join__Graph!) repeatable on ENUM_VALUE
+
+directive @join__field(graph: join__Graph, requires: join__FieldSet, provides: join__FieldSet, type: String, external: Boolean, override: String, usedOverridden: Boolean) repeatable on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+
+directive @join__graph(name: String!, url: String!) on ENUM_VALUE
+
+directive @join__implements(graph: join__Graph!, interface: String!) repeatable on OBJECT | INTERFACE
+
+directive @join__type(graph: join__Graph!, key: join__FieldSet, extension: Boolean! = false, resolvable: Boolean! = true, isInterfaceObject: Boolean! = false) repeatable on OBJECT | INTERFACE | UNION | ENUM | INPUT_OBJECT | SCALAR
+
+directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on UNION
+
+directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
+
+scalar join__FieldSet
+
+enum join__Graph {
+  LOAN_ORIGINATION @join__graph(name: "loan-origination", url: "http://loan-origination:4001/graphql")
+  LOAN_DECISIONS @join__graph(name: "loan-decisions", url: "http://loan-decisions:4002/graphql")
+}
+
+scalar link__Import
+
+enum link__Purpose {
+  SECURITY
+  EXECUTION
+}
+
+type Query
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__type(graph: LOAN_DECISIONS)
+{
+  loanOriginationEvents(loanRequestId: ID!): LoanOriginationEvents!
+    @join__field(graph: LOAN_ORIGINATION)
+  loanDecisionEvents(loanRequestId: ID!): LoanDecisionEvents!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+type Mutation
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__type(graph: LOAN_DECISIONS)
+{
+  recordLoanRequested(input: LoanRequestedInput!, metadata: EventMetadataInput!): LoanRequestedEvent!
+    @join__field(graph: LOAN_ORIGINATION)
+  recordCreditChecked(input: CreditCheckedInput!, metadata: EventMetadataInput!): CreditCheckedEvent!
+    @join__field(graph: LOAN_ORIGINATION)
+  recordAutomatedSummary(input: AutomatedSummaryInput!, metadata: EventMetadataInput!): AutomatedSummaryEvent!
+    @join__field(graph: LOAN_ORIGINATION)
+  recordLoanApprovalNeeded(input: LoanApprovalNeededInput!, metadata: EventMetadataInput!): LoanApprovalNeededEvent!
+    @join__field(graph: LOAN_DECISIONS)
+  recordLoanAutomaticallyApproved(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyApprovedEvent!
+    @join__field(graph: LOAN_DECISIONS)
+  recordLoanAutomaticallyDenied(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyDeniedEvent!
+    @join__field(graph: LOAN_DECISIONS)
+  recordLoanManuallyApproved(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyApprovedEvent!
+    @join__field(graph: LOAN_DECISIONS)
+  recordLoanManuallyDenied(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyDeniedEvent!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+type LoanOriginationEvents
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  loanRequested: LoanRequestedEvent
+    @join__field(graph: LOAN_ORIGINATION)
+  creditChecks: [CreditCheckedEvent!]!
+    @join__field(graph: LOAN_ORIGINATION)
+  automatedSummaries: [AutomatedSummaryEvent!]!
+    @join__field(graph: LOAN_ORIGINATION)
+}
+
+type LoanDecisionEvents
+  @join__type(graph: LOAN_DECISIONS)
+{
+  approvalsNeeded: [LoanApprovalNeededEvent!]!
+    @join__field(graph: LOAN_DECISIONS)
+  automaticApprovals: [LoanAutomaticallyApprovedEvent!]!
+    @join__field(graph: LOAN_DECISIONS)
+  automaticDenials: [LoanAutomaticallyDeniedEvent!]!
+    @join__field(graph: LOAN_DECISIONS)
+  manualApprovals: [LoanManuallyApprovedEvent!]!
+    @join__field(graph: LOAN_DECISIONS)
+  manualDenials: [LoanManuallyDeniedEvent!]!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+interface LoanApplicationEvent
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_ORIGINATION)
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+type EventMetadata
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__type(graph: LOAN_DECISIONS)
+{
+  correlationId: ID!
+    @join__field(graph: LOAN_ORIGINATION)
+    @join__field(graph: LOAN_DECISIONS)
+  causationId: ID!
+    @join__field(graph: LOAN_ORIGINATION)
+    @join__field(graph: LOAN_DECISIONS)
+  transactionTimestamp: String!
+    @join__field(graph: LOAN_ORIGINATION)
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+input EventMetadataInput
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__type(graph: LOAN_DECISIONS)
+{
+  correlationId: ID!
+  causationId: ID!
+  transactionTimestamp: String!
+}
+
+type LoanApplicantAddress
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  Street: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  City: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Region: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Country: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  PostalCode: String!
+    @join__field(graph: LOAN_ORIGINATION)
+}
+
+input LoanApplicantAddressInput
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  Street: String!
+  City: String!
+  Region: String!
+  Country: String!
+  PostalCode: String!
+}
+
+type LoanRequestedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_ORIGINATION)
+  Amount: Float!
+    @join__field(graph: LOAN_ORIGINATION)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_ORIGINATION)
+  NationalID: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Name: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Gender: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Age: Int!
+    @join__field(graph: LOAN_ORIGINATION)
+  MaritalStatus: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Dependents: Int!
+    @join__field(graph: LOAN_ORIGINATION)
+  EducationLevel: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  EmployerName: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  JobTitle: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  JobSeniority: Float!
+    @join__field(graph: LOAN_ORIGINATION)
+  Income: Float!
+    @join__field(graph: LOAN_ORIGINATION)
+  Address: LoanApplicantAddress!
+    @join__field(graph: LOAN_ORIGINATION)
+  LoanRequestedTimestamp: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  LoanProductID: Int
+    @join__field(graph: LOAN_ORIGINATION)
+}
+
+input LoanRequestedInput
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  Amount: Float!
+  LoanRequestID: ID!
+  NationalID: String!
+  Name: String!
+  Gender: String!
+  Age: Int!
+  MaritalStatus: String!
+  Dependents: Int!
+  EducationLevel: String!
+  EmployerName: String!
+  JobTitle: String!
+  JobSeniority: Float!
+  Income: Float!
+  Address: LoanApplicantAddressInput!
+  LoanRequestedTimestamp: String!
+  LoanProductID: Int
+}
+
+type CreditCheckedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_ORIGINATION)
+  NationalID: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  Score: Int!
+    @join__field(graph: LOAN_ORIGINATION)
+  CreditCheckedTimestamp: String!
+    @join__field(graph: LOAN_ORIGINATION)
+}
+
+input CreditCheckedInput
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  NationalID: String!
+  Score: Int!
+  CreditCheckedTimestamp: String!
+}
+
+type AutomatedSummaryEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_ORIGINATION)
+  CreditScoreSummary: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  IncomeAndEmploymentSummary: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  LoanToIncomeSummary: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  MaritalStatusAndDependentsSummary: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  RecommendedFurtherInvestigation: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  SummarizedBy: String!
+    @join__field(graph: LOAN_ORIGINATION)
+  SummarizedAt: String!
+    @join__field(graph: LOAN_ORIGINATION)
+}
+
+input AutomatedSummaryInput
+  @join__type(graph: LOAN_ORIGINATION)
+{
+  CreditScoreSummary: String!
+  IncomeAndEmploymentSummary: String!
+  LoanToIncomeSummary: String!
+  MaritalStatusAndDependentsSummary: String!
+  RecommendedFurtherInvestigation: String!
+  SummarizedBy: String!
+  SummarizedAt: String!
+}
+
+type LoanApprovalNeededEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanAutomatedDecisionTimestamp: String!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+input LoanApprovalNeededInput
+  @join__type(graph: LOAN_DECISIONS)
+{
+  LoanRequestID: ID!
+  LoanAutomatedDecisionTimestamp: String!
+}
+
+type LoanAutomaticallyApprovedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanAutomatedDecisionTimestamp: String!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+type LoanAutomaticallyDeniedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanAutomatedDecisionTimestamp: String!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+input LoanAutomatedDecisionInput
+  @join__type(graph: LOAN_DECISIONS)
+{
+  LoanRequestID: ID!
+  LoanAutomatedDecisionTimestamp: String!
+}
+
+type LoanManuallyApprovedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_DECISIONS)
+  ApproverName: String!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanManualDecisionTimestamp: String!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+type LoanManuallyDeniedEvent implements LoanApplicationEvent
+  @join__type(graph: LOAN_DECISIONS)
+{
+  metadata: EventMetadata!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanRequestID: ID!
+    @join__field(graph: LOAN_DECISIONS)
+  ApproverName: String!
+    @join__field(graph: LOAN_DECISIONS)
+  LoanManualDecisionTimestamp: String!
+    @join__field(graph: LOAN_DECISIONS)
+}
+
+input LoanManualDecisionInput
+  @join__type(graph: LOAN_DECISIONS)
+{
+  LoanRequestID: ID!
+  ApproverName: String!
+  LoanManualDecisionTimestamp: String!
+}
+
+union LoanDecisionEvent
+  @join__type(graph: LOAN_DECISIONS)
+  @join__unionMember(graph: LOAN_DECISIONS, member: "LoanApprovalNeededEvent")
+  @join__unionMember(graph: LOAN_DECISIONS, member: "LoanAutomaticallyApprovedEvent")
+  @join__unionMember(graph: LOAN_DECISIONS, member: "LoanAutomaticallyDeniedEvent")
+  @join__unionMember(graph: LOAN_DECISIONS, member: "LoanManuallyApprovedEvent")
+  @join__unionMember(graph: LOAN_DECISIONS, member: "LoanManuallyDeniedEvent")
+= LoanApprovalNeededEvent | LoanAutomaticallyApprovedEvent | LoanAutomaticallyDeniedEvent | LoanManuallyApprovedEvent | LoanManuallyDeniedEvent
+
+union LoanOriginationEvent
+  @join__type(graph: LOAN_ORIGINATION)
+  @join__unionMember(graph: LOAN_ORIGINATION, member: "LoanRequestedEvent")
+  @join__unionMember(graph: LOAN_ORIGINATION, member: "CreditCheckedEvent")
+  @join__unionMember(graph: LOAN_ORIGINATION, member: "AutomatedSummaryEvent")
+= LoanRequestedEvent | CreditCheckedEvent | AutomatedSummaryEvent

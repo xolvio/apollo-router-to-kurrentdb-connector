@@ -1,0 +1,9 @@
+plugins:
+  starstuff.mutation_plugin:
+    message: "starting my plugin"
+
+homepage:
+  enabled: true
+
+supergraph:
+  introspection: true

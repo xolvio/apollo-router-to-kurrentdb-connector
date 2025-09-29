@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 apollo-router = "2.7.0"
 apollo-parser = "0.8.4"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.188", features = ["derive"] }
 serde_json = { version = "1" }
 serde_json_bytes = "0.2.5"
 schemars = "1.0.4"
@@ -14,3 +14,10 @@ async-trait = "0.1"
 tracing = "0.1"
 tower = { version = "0.5.2", default-features = true }
 tower-service = "0.3"
+futures = "0.3.28"
+tokio = { version = "1.32.0", features = ["full"] }
+uuid = { version = "1.7", features = ["v4"] }
+
+[dependencies.kurrentdb]
+git = "https://github.com/kurrent-io/KurrentDB-Client-Rust"
+package = "kurrentdb"

@@ -3,10 +3,14 @@ use apollo_router::{
     plugin::{Plugin, PluginInit},
     services::supergraph,
 };
+use kurrentdb::{Client, ClientSettings, EventData};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::{io, sync::Arc};
+use tokio::task;
 use tower::ServiceExt;
 use tower::{BoxError, ServiceBuilder};
+use uuid::Uuid;
 
 use apollo_parser::cst::Value::*;
 use apollo_parser::cst::{Definition, Selection, SelectionSet, Value as ASTValue};
@@ -15,14 +19,28 @@ fn default_message() -> String {
     "starting my plugin".to_string()
 }
 
+fn default_connection_string() -> String {
+    "kurrentdb://kurrentdb:2113?tls=false&tlsVerifyCert=false".to_string()
+}
+
+fn default_stream_prefix() -> String {
+    "graphql-mutation-".to_string()
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct PluginConfig {
     #[serde(default = "default_message")]
     pub message: String,
+    #[serde(default = "default_connection_string")]
+    pub connection_string: String,
+    #[serde(default = "default_stream_prefix")]
+    pub stream_prefix: String,
 }
 
-#[derive(Debug)]
-pub struct MutationToKurrent;
+pub struct MutationToKurrent {
+    client: Arc<Client>,
+    stream_prefix: String,
+}
 
 #[async_trait::async_trait]
 impl Plugin for MutationToKurrent {
@@ -32,11 +50,26 @@ impl Plugin for MutationToKurrent {
     where
         Self: Sized,
     {
-        tracing::info!(message = %init.config.message, "starstuff.hello_world plugin initialized");
-        Ok(Self)
+        let settings: ClientSettings = init
+            .config
+            .connection_string
+            .parse()
+            .map_err(|err| -> BoxError { Box::new(err) })?;
+
+        let client = Client::new(settings)
+            .map_err(|err| -> BoxError { Box::new(io::Error::new(io::ErrorKind::Other, err)) })?;
+
+        tracing::info!(message = %init.config.message, connection = %init.config.connection_string, "starstuff.mutation_plugin connected to KurrentDB");
+
+        Ok(Self {
+            client: Arc::new(client),
+            stream_prefix: init.config.stream_prefix,
+        })
     }
 
     fn supergraph_service(&self, service: supergraph::BoxService) -> supergraph::BoxService {
+        let client = self.client.clone();
+        let stream_prefix = self.stream_prefix.clone();
         ServiceBuilder::new()
             .map_request(move |mut req: supergraph::Request| {
                 let gql_req = req.supergraph_request.body();
@@ -48,6 +81,16 @@ impl Plugin for MutationToKurrent {
                         req.supergraph_request.extensions_mut().insert(calls.clone());
                         // Log a concise, structured summary
                         tracing::info!(mutations = ?calls, count = calls.len(), "Detected GraphQL mutation(s)");
+
+                        let client = client.clone();
+                        let stream_prefix = stream_prefix.clone();
+                        let payload = calls.clone();
+
+                        task::spawn(async move {
+                            if let Err(error) = persist_mutations(client, stream_prefix, payload).await {
+                                tracing::error!(error = %error, "Failed to persist mutations to KurrentDB");
+                            }
+                        });
                     }
                 }
 
@@ -82,6 +125,34 @@ pub struct MutationCall {
     pub alias: Option<String>,
     pub arguments: Vec<MutationArg>,
     pub selected_fields: Vec<String>,
+}
+
+async fn persist_mutations(
+    client: Arc<Client>,
+    stream_prefix: String,
+    calls: Vec<MutationCall>,
+) -> Result<(), BoxError> {
+    for call in calls {
+        let stream_name = format!("{}{}", stream_prefix, call.field_name);
+        let event_type = format!(
+            "GraphQL.{}",
+            call.operation_name.as_deref().unwrap_or(&call.field_name)
+        );
+
+        let event_id = Uuid::new_v4();
+        let event = EventData::json(&event_type, &call)
+            .map_err(|err| -> BoxError { Box::new(err) })?
+            .id(event_id);
+
+        client
+            .append_to_stream(stream_name.clone(), &Default::default(), event)
+            .await
+            .map_err(|err| -> BoxError { Box::new(err) })?;
+
+        tracing::info!(stream = %stream_name, event_type = %event_type, event_id = %event_id, "Persisted GraphQL mutation event to KurrentDB");
+    }
+
+    Ok(())
 }
 
 fn ast_value_to_json(value: &ASTValue, vars: &BytesMap<ByteString, BytesValue>) -> Option<Value> {

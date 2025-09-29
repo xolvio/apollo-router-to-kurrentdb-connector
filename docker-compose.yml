@@ -1,4 +1,21 @@
 services:
+  kurrentdb:
+    image: eventstore/eventstore:23.10.0-jammy
+    platform: linux/amd64
+    environment:
+      EVENTSTORE_CLUSTER_SIZE: "1"
+      EVENTSTORE_RUN_PROJECTIONS: "All"
+      EVENTSTORE_START_STANDARD_PROJECTIONS: "True"
+      EVENTSTORE_INSECURE: "true"
+      EVENTSTORE_EXT_IP: "0.0.0.0"
+      EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP: "true"
+      EVENTSTORE_HTTP_PORT: "2113"
+      EVENTSTORE_MEM_DB: "false"
+    ports:
+      - "2113:2113"
+    volumes:
+      - kurrent-data:/var/lib/eventstore
+
   loan-origination:
     image: node:20-alpine
     working_dir: /app
@@ -26,6 +43,7 @@ services:
     depends_on:
       - loan-origination
       - loan-decisions
+      - kurrentdb
     working_dir: /app
     volumes:
       - ./:/app
@@ -37,3 +55,4 @@ services:
 
 volumes:
   cargo-target:
+  kurrent-data:

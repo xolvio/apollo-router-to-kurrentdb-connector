@@ -1,6 +1,8 @@
 plugins:
   starstuff.mutation_plugin:
     message: "starting my plugin"
+    connection_string: "kurrentdb://kurrentdb:2113?tls=false"
+    stream_prefix: "graphql-mutation-"
 
 homepage:
   enabled: true

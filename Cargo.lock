@@ -5317,6 +5317,7 @@ dependencies = [
  "apollo-router",
  "async-trait",
  "futures",
+ "http 0.2.12",
  "kurrentdb",
  "schemars",
  "serde",

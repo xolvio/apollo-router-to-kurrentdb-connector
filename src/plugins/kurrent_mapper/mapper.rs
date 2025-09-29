@@ -44,6 +44,10 @@ pub struct KurrentService {
     stream_prefix: String,
 }
 
+pub trait MutationSink: Send + Sync {
+    fn persist_mutations(&self, calls: Vec<MutationCall>);
+}
+
 impl KurrentService {
     pub async fn new(config: KurrentConfig) -> Result<Self, BoxError> {
         let settings: ClientSettings = config
@@ -62,9 +66,13 @@ impl KurrentService {
         })
     }
 
-    pub async fn persist_mutations(&self, calls: Vec<MutationCall>) -> Result<(), BoxError> {
+    async fn persist_batch(
+        client: Arc<Client>,
+        stream_prefix: String,
+        calls: Vec<MutationCall>,
+    ) -> Result<(), BoxError> {
         for call in calls {
-            let stream_name = format!("{}{}", self.stream_prefix, call.field_name);
+            let stream_name = format!("{}{}", stream_prefix, call.field_name);
             let event_type = format!(
                 "GraphQL.{}",
                 call.operation_name.as_deref().unwrap_or(&call.field_name)
@@ -75,7 +83,7 @@ impl KurrentService {
                 .map_err(|err| -> BoxError { Box::new(err) })?
                 .id(event_id);
 
-            self.client
+            client
                 .append_to_stream(stream_name.clone(), &Default::default(), event)
                 .await
                 .map_err(|err| -> BoxError { Box::new(err) })?;
@@ -85,17 +93,15 @@ impl KurrentService {
 
         Ok(())
     }
+}
 
-    pub fn spawn_persist_task(&self, calls: Vec<MutationCall>) {
+impl MutationSink for KurrentService {
+    fn persist_mutations(&self, calls: Vec<MutationCall>) {
         let client = self.client.clone();
         let stream_prefix = self.stream_prefix.clone();
-        let service = Self {
-            client,
-            stream_prefix,
-        };
 
         task::spawn(async move {
-            if let Err(error) = service.persist_mutations(calls).await {
+            if let Err(error) = KurrentService::persist_batch(client, stream_prefix, calls).await {
                 tracing::error!(error = %error, "Failed to persist mutations to KurrentDB");
             }
         });

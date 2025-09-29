@@ -21,3 +21,6 @@ uuid = { version = "1.7", features = ["v4"] }
 [dependencies.kurrentdb]
 git = "https://github.com/kurrent-io/KurrentDB-Client-Rust"
 package = "kurrentdb"
+
+[dev-dependencies]
+http = "0.2"

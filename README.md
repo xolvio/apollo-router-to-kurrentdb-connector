@@ -61,8 +61,11 @@ with inputs:
 ```
 - navigate to `http://localhost:2113/web/index.html#/streams` and you should see the event in the `graphql-mutation-recordAutomatedSummary` stream.
 - verify the event shows up in the list of events in that stream page.
+ <img width="2630" height="2060" alt="CleanShot 2025-09-29 at 11 12 45@2x" src="https://github.com/user-attachments/assets/3a370799-d010-47bd-a886-bf960a5be270" />
+ <img width="2584" height="2028" alt="CleanShot 2025-09-29 at 11 12 28@2x" src="https://github.com/user-attachments/assets/c83904af-0731-4fa3-9164-9d3fe5a5c636" />
 
-## How the mutations land in KurrentDB
+## How the mutations
+land in KurrentDB
 
   - The supergraph schema mirrors the JSON definitions under target-domain-schemas/.
   Every mutation field (e.g. recordLoanRequested) exposes an input whose shape matches the

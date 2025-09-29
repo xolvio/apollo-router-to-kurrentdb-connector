@@ -1,0 +1,39 @@
+services:
+  loan-origination:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./subgraphs/loan-origination:/app
+    command: sh -c "npm install && node index.mjs"
+    environment:
+      - PORT=4001
+    ports:
+      - "4001:4001"
+
+  loan-decisions:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./subgraphs/loan-decisions:/app
+    command: sh -c "npm install && node index.mjs"
+    environment:
+      - PORT=4002
+    ports:
+      - "4002:4002"
+
+  apollo-router:
+    image: rustlang/rust:nightly-bullseye
+    depends_on:
+      - loan-origination
+      - loan-decisions
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - cargo-target:/app/target
+    command: >-
+      bash -lc "apt-get update && apt-get install -y protobuf-compiler && source /usr/local/cargo/env && cargo run -- --hot-reload --listen 0.0.0.0:4000 --supergraph supergraph-schema.graphql --config router.yaml"
+    ports:
+      - "127.0.0.1:4000:4000"
+
+volumes:
+  cargo-target:

@@ -20,6 +20,48 @@ docker compose up
 
 The first build downloads a large dependency set for Apollo Router; allow several minutes to complete.
 
+
+## How to verify events land in running application
+
+- Start the server via `docker compose up`
+- Navigate to "https://studio.apollographql.com/sandbox/explorer" and enter "http://localhost:4000" for the sandbox URL.
+- Run a mutation like: 
+```graphql
+mutation RecordAutomatedSummary($input: AutomatedSummaryInput!, $metadata: EventMetadataInput!) {
+  recordAutomatedSummary(input: $input, metadata: $metadata) {
+    CreditScoreSummary
+    IncomeAndEmploymentSummary
+    LoanToIncomeSummary
+    metadata {
+      causationId
+      correlationId
+    }
+  }
+}
+```
+with inputs:
+
+```json
+{
+  "input": {
+    "CreditScoreSummary": "3rd summary check",
+    "IncomeAndEmploymentSummary": "income syummary",
+    "LoanToIncomeSummary": "loan income",
+    "MaritalStatusAndDependentsSummary": "married with kids",
+    "RecommendedFurtherInvestigation": "no further invstigation",
+    "SummarizedAt": "1758982243380",
+    "SummarizedBy": "Billy"
+  },
+  "metadata": {
+    "causationId": "cuasation1123",
+    "correlationId": "correlation312",
+    "transactionTimestamp":"1758982243380" 
+  }
+}
+```
+- navigate to `http://localhost:2113/web/index.html#/streams` and you should see the event in the `graphql-mutation-recordAutomatedSummary` stream.
+- verify the event shows up in the list of events in that stream page.
+
 ## How the mutations land in KurrentDB
 
   - The supergraph schema mirrors the JSON definitions under target-domain-schemas/.

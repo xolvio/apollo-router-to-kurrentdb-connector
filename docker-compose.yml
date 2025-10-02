@@ -1,16 +1,12 @@
 services:
   kurrentdb:
-    image: eventstore/eventstore:23.10.0-jammy
+    image: docker.cloudsmith.io/eventstore/kurrent-latest/kurrentdb:25.0.0
     platform: linux/amd64
     environment:
-      EVENTSTORE_CLUSTER_SIZE: "1"
-      EVENTSTORE_RUN_PROJECTIONS: "All"
-      EVENTSTORE_START_STANDARD_PROJECTIONS: "True"
-      EVENTSTORE_INSECURE: "true"
-      EVENTSTORE_EXT_IP: "0.0.0.0"
-      EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP: "true"
-      EVENTSTORE_HTTP_PORT: "2113"
-      EVENTSTORE_MEM_DB: "false"
+      KURRENTDB_RUN_PROJECTIONS: "All"
+      KURRENTDB_START_STANDARD_PROJECTIONS: "True"
+      KURRENTDB_INSECURE: "true"
+      KURRENTDB_ENABLE_ATOM_PUB_OVER_HTTP: "true"
     ports:
       - "2113:2113"
     volumes:

@@ -64,8 +64,7 @@ with inputs:
  <img width="2630" height="2060" alt="CleanShot 2025-09-29 at 11 12 45@2x" src="https://github.com/user-attachments/assets/3a370799-d010-47bd-a886-bf960a5be270" />
  <img width="2584" height="2028" alt="CleanShot 2025-09-29 at 11 12 28@2x" src="https://github.com/user-attachments/assets/c83904af-0731-4fa3-9164-9d3fe5a5c636" />
 
-## How the mutations
-land in KurrentDB
+## How the mutations land in KurrentDB
 
   - The supergraph schema mirrors the JSON definitions under target-domain-schemas/.
   Every mutation field (e.g. recordLoanRequested) exposes an input whose shape matches the
@@ -93,6 +92,40 @@ land in KurrentDB
   2. the serialized payload presented to the sink matches the GraphQL input (already validated against the target domain schemas).
 - The trait-based injection keeps the runtime logic untouched while making the plugin easy to exercise with `cargo test`.
 
+
+## What currently gets captured
+
+Given this mutation:
+
+```graphql
+mutation  CreateOrder{
+  createOrder(input: {...}) {           ← Level 1: Captured as MutationCall
+    order {                              ← Level 2: "order" goes into selected_fields
+      id                                 ← Level 3: NOT captured
+      customer {                         ← Level 3: NOT captured
+        name                             ← Level 4: NOT captured
+        email                            ← Level 4: NOT captured
+      }
+    }
+    success                              ← Level 2: "success" goes into selected_fields
+  }
+}
+```
+### What gets captured:
+
+operation_name: "CreateOrder"
+
+field_name: "createOrder"
+
+arguments: the input arg
+
+selected_fields: ["order", "success"] ← Only these two strings!
+
+### What does NOT get captured:
+
+That order has nested fields like id and customer
+
+That customer has name and email
 
 
 ## Modifying the Plugins

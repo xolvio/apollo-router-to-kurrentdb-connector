@@ -7,16 +7,18 @@ use tokio::task;
 use tower::BoxError;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationArg {
     pub name: String,
     pub value: Value,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationCall {
     pub operation_name: Option<String>,
     pub field_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loan_id: Option<String>,
     pub alias: Option<String>,
     pub arguments: Vec<MutationArg>,
     pub selected_fields: Vec<String>,

@@ -48,21 +48,21 @@ type Mutation
   @join__type(graph: LOAN_ORIGINATION)
   @join__type(graph: LOAN_DECISIONS)
 {
-  recordLoanRequested(input: LoanRequestedInput!, metadata: EventMetadataInput!): LoanRequestedEvent!
+  recordLoanRequested(input: LoanRequestedInput!): ID!
     @join__field(graph: LOAN_ORIGINATION)
-  recordCreditChecked(input: CreditCheckedInput!, metadata: EventMetadataInput!): CreditCheckedEvent!
+  recordCreditChecked(input: CreditCheckedInput!): CreditCheckedEvent!
     @join__field(graph: LOAN_ORIGINATION)
-  recordAutomatedSummary(input: AutomatedSummaryInput!, metadata: EventMetadataInput!): AutomatedSummaryEvent!
+  recordAutomatedSummary(input: AutomatedSummaryInput!): AutomatedSummaryEvent!
     @join__field(graph: LOAN_ORIGINATION)
-  recordLoanApprovalNeeded(input: LoanApprovalNeededInput!, metadata: EventMetadataInput!): LoanApprovalNeededEvent!
+  recordLoanApprovalNeeded(input: LoanApprovalNeededInput!): LoanApprovalNeededEvent!
     @join__field(graph: LOAN_DECISIONS)
-  recordLoanAutomaticallyApproved(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyApprovedEvent!
+  recordLoanAutomaticallyApproved(input: LoanAutomatedDecisionInput!): LoanAutomaticallyApprovedEvent!
     @join__field(graph: LOAN_DECISIONS)
-  recordLoanAutomaticallyDenied(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyDeniedEvent!
+  recordLoanAutomaticallyDenied(input: LoanAutomatedDecisionInput!): LoanAutomaticallyDeniedEvent!
     @join__field(graph: LOAN_DECISIONS)
-  recordLoanManuallyApproved(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyApprovedEvent!
+  recordLoanManuallyApproved(input: LoanManualDecisionInput!): LoanManuallyApprovedEvent!
     @join__field(graph: LOAN_DECISIONS)
-  recordLoanManuallyDenied(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyDeniedEvent!
+  recordLoanManuallyDenied(input: LoanManualDecisionInput!): LoanManuallyDeniedEvent!
     @join__field(graph: LOAN_DECISIONS)
 }
 
@@ -92,39 +92,6 @@ type LoanDecisionEvents
     @join__field(graph: LOAN_DECISIONS)
 }
 
-interface LoanApplicationEvent
-  @join__type(graph: LOAN_ORIGINATION)
-  @join__type(graph: LOAN_DECISIONS)
-{
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_ORIGINATION)
-    @join__field(graph: LOAN_DECISIONS)
-}
-
-type EventMetadata
-  @join__type(graph: LOAN_ORIGINATION)
-  @join__type(graph: LOAN_DECISIONS)
-{
-  correlationId: ID!
-    @join__field(graph: LOAN_ORIGINATION)
-    @join__field(graph: LOAN_DECISIONS)
-  causationId: ID!
-    @join__field(graph: LOAN_ORIGINATION)
-    @join__field(graph: LOAN_DECISIONS)
-  transactionTimestamp: String!
-    @join__field(graph: LOAN_ORIGINATION)
-    @join__field(graph: LOAN_DECISIONS)
-}
-
-input EventMetadataInput
-  @join__type(graph: LOAN_ORIGINATION)
-  @join__type(graph: LOAN_DECISIONS)
-{
-  correlationId: ID!
-  causationId: ID!
-  transactionTimestamp: String!
-}
-
 type LoanApplicantAddress
   @join__type(graph: LOAN_ORIGINATION)
 {
@@ -150,11 +117,9 @@ input LoanApplicantAddressInput
   PostalCode: String!
 }
 
-type LoanRequestedEvent implements LoanApplicationEvent
+type LoanRequestedEvent
   @join__type(graph: LOAN_ORIGINATION)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_ORIGINATION)
   Amount: Float!
     @join__field(graph: LOAN_ORIGINATION)
   LoanRequestID: ID!
@@ -193,7 +158,6 @@ input LoanRequestedInput
   @join__type(graph: LOAN_ORIGINATION)
 {
   Amount: Float!
-  LoanRequestID: ID!
   NationalID: String!
   Name: String!
   Gender: String!
@@ -210,10 +174,10 @@ input LoanRequestedInput
   LoanProductID: Int
 }
 
-type CreditCheckedEvent implements LoanApplicationEvent
+type CreditCheckedEvent
   @join__type(graph: LOAN_ORIGINATION)
 {
-  metadata: EventMetadata!
+  LoanRequestID: ID!
     @join__field(graph: LOAN_ORIGINATION)
   NationalID: String!
     @join__field(graph: LOAN_ORIGINATION)
@@ -226,15 +190,16 @@ type CreditCheckedEvent implements LoanApplicationEvent
 input CreditCheckedInput
   @join__type(graph: LOAN_ORIGINATION)
 {
+  loanId: ID!
   NationalID: String!
   Score: Int!
   CreditCheckedTimestamp: String!
 }
 
-type AutomatedSummaryEvent implements LoanApplicationEvent
+type AutomatedSummaryEvent
   @join__type(graph: LOAN_ORIGINATION)
 {
-  metadata: EventMetadata!
+  LoanRequestID: ID!
     @join__field(graph: LOAN_ORIGINATION)
   CreditScoreSummary: String!
     @join__field(graph: LOAN_ORIGINATION)
@@ -255,6 +220,7 @@ type AutomatedSummaryEvent implements LoanApplicationEvent
 input AutomatedSummaryInput
   @join__type(graph: LOAN_ORIGINATION)
 {
+  loanId: ID!
   CreditScoreSummary: String!
   IncomeAndEmploymentSummary: String!
   LoanToIncomeSummary: String!
@@ -264,11 +230,9 @@ input AutomatedSummaryInput
   SummarizedAt: String!
 }
 
-type LoanApprovalNeededEvent implements LoanApplicationEvent
+type LoanApprovalNeededEvent
   @join__type(graph: LOAN_DECISIONS)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_DECISIONS)
   LoanRequestID: ID!
     @join__field(graph: LOAN_DECISIONS)
   LoanAutomatedDecisionTimestamp: String!
@@ -278,26 +242,22 @@ type LoanApprovalNeededEvent implements LoanApplicationEvent
 input LoanApprovalNeededInput
   @join__type(graph: LOAN_DECISIONS)
 {
-  LoanRequestID: ID!
+  loanId: ID!
   LoanAutomatedDecisionTimestamp: String!
 }
 
-type LoanAutomaticallyApprovedEvent implements LoanApplicationEvent
+type LoanAutomaticallyApprovedEvent
   @join__type(graph: LOAN_DECISIONS)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_DECISIONS)
   LoanRequestID: ID!
     @join__field(graph: LOAN_DECISIONS)
   LoanAutomatedDecisionTimestamp: String!
     @join__field(graph: LOAN_DECISIONS)
 }
 
-type LoanAutomaticallyDeniedEvent implements LoanApplicationEvent
+type LoanAutomaticallyDeniedEvent
   @join__type(graph: LOAN_DECISIONS)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_DECISIONS)
   LoanRequestID: ID!
     @join__field(graph: LOAN_DECISIONS)
   LoanAutomatedDecisionTimestamp: String!
@@ -307,15 +267,13 @@ type LoanAutomaticallyDeniedEvent implements LoanApplicationEvent
 input LoanAutomatedDecisionInput
   @join__type(graph: LOAN_DECISIONS)
 {
-  LoanRequestID: ID!
+  loanId: ID!
   LoanAutomatedDecisionTimestamp: String!
 }
 
-type LoanManuallyApprovedEvent implements LoanApplicationEvent
+type LoanManuallyApprovedEvent
   @join__type(graph: LOAN_DECISIONS)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_DECISIONS)
   LoanRequestID: ID!
     @join__field(graph: LOAN_DECISIONS)
   ApproverName: String!
@@ -324,11 +282,9 @@ type LoanManuallyApprovedEvent implements LoanApplicationEvent
     @join__field(graph: LOAN_DECISIONS)
 }
 
-type LoanManuallyDeniedEvent implements LoanApplicationEvent
+type LoanManuallyDeniedEvent
   @join__type(graph: LOAN_DECISIONS)
 {
-  metadata: EventMetadata!
-    @join__field(graph: LOAN_DECISIONS)
   LoanRequestID: ID!
     @join__field(graph: LOAN_DECISIONS)
   ApproverName: String!
@@ -340,7 +296,7 @@ type LoanManuallyDeniedEvent implements LoanApplicationEvent
 input LoanManualDecisionInput
   @join__type(graph: LOAN_DECISIONS)
 {
-  LoanRequestID: ID!
+  loanId: ID!
   ApproverName: String!
   LoanManualDecisionTimestamp: String!
 }

@@ -1,8 +1,10 @@
 use apollo_parser::{Parser, cst::CstNode};
 use apollo_router::{
+    layers::ServiceBuilderExt,
     plugin::{Plugin, PluginInit},
     services::supergraph,
 };
+use futures::stream::StreamExt;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -52,21 +54,63 @@ impl Plugin for MutationInterceptor {
 
     fn supergraph_service(&self, service: supergraph::BoxService) -> supergraph::BoxService {
         let mutation_sink = self.mutation_sink.clone();
+
         ServiceBuilder::new()
-            .map_request(move |mut req: supergraph::Request| {
+            .map_request(move |req: supergraph::Request| {
                 let gql_req = req.supergraph_request.body();
 
                 if let Some(query) = gql_req.query.as_ref() {
                     let calls = extract_mutations(query, &gql_req.variables);
                     if !calls.is_empty() {
-                        req.supergraph_request.extensions_mut().insert(calls.clone());
-                        tracing::info!(mutations = ?calls, count = calls.len(), "Detected GraphQL mutation(s)");
-                        mutation_sink.persist_mutations(calls);
+                        tracing::info!(mutations = ?calls, count = calls.len(), "Detected GraphQL mutation(s) in request");
+                        req.context.insert("pending_mutations", calls).unwrap();
                     }
                 }
 
                 req
             })
+            .map_future_with_request_data(
+                |req: &supergraph::Request| {
+                    req.context
+                        .get::<_, Vec<MutationCall>>("pending_mutations")
+                        .ok()
+                        .flatten()
+                },
+                move |pending_calls: Option<Vec<MutationCall>>, fut| {
+                    let mutation_sink = mutation_sink.clone();
+                    async move {
+                        let mut res: supergraph::Response = fut.await?;
+
+                        if let Some(calls) = pending_calls {
+                            let old_body = std::mem::replace(
+                                res.response.body_mut(),
+                                Box::pin(futures::stream::empty())
+                            );
+
+                            let mapped_stream = old_body.map(move |graphql_response| {
+                                if let Some(data) = graphql_response.data.as_ref() {
+                                    let enriched_calls = enrich_mutations_with_response(calls.clone(), data);
+
+                                    tracing::info!(
+                                        mutations = ?enriched_calls,
+                                        count = enriched_calls.len(),
+                                        "Persisting successful mutation(s) with response data"
+                                    );
+
+                                    mutation_sink.persist_mutations(enriched_calls);
+                                } else if graphql_response.errors.is_empty() {
+                                    tracing::warn!("Mutation completed but no data in response, skipping persistence");
+                                }
+                                graphql_response
+                            });
+
+                            *res.response.body_mut() = Box::pin(mapped_stream);
+                        }
+
+                        Ok(res)
+                    }
+                },
+            )
             .service(service)
             .boxed()
     }
@@ -159,6 +203,57 @@ fn collect_args(
     args
 }
 
+fn extract_loan_id_from_args(arguments: &[MutationArg]) -> Option<String> {
+    // Look for an "input" argument
+    arguments
+        .iter()
+        .find(|arg| arg.name == "input")
+        .and_then(|input_arg| {
+            // Check if the input value is an object with a "loanId" field
+            input_arg
+                .value
+                .get("loanId")
+                .and_then(|loan_id_value| loan_id_value.as_str().map(|s| s.to_string()))
+        })
+}
+
+fn enrich_mutations_with_response(
+    mut calls: Vec<MutationCall>,
+    response_data: &serde_json_bytes::Value,
+) -> Vec<MutationCall> {
+    let data_json = match serde_json::to_value(response_data) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to convert response data to JSON");
+            return calls;
+        }
+    };
+
+    for call in calls.iter_mut() {
+        let response_value = if let Some(alias) = &call.alias {
+            data_json.get(alias)
+        } else {
+            data_json.get(&call.field_name)
+        };
+
+        if let Some(value) = response_value {
+            if call.field_name == "recordLoanRequested" {
+                if let Some(loan_id) = value.as_str() {
+                    call.loan_id = Some(loan_id.to_string());
+                    tracing::debug!(loan_id = %loan_id, mutation = %call.field_name, "Extracted loanId from response");
+                }
+            } else {
+                call.arguments.push(MutationArg {
+                    name: "responseData".to_string(),
+                    value: value.clone(),
+                });
+            }
+        }
+    }
+
+    calls
+}
+
 pub fn extract_mutations(
     query: &str,
     variables: &BytesMap<ByteString, BytesValue>,
@@ -183,11 +278,16 @@ pub fn extract_mutations(
                                     .alias()
                                     .and_then(|a| a.name().map(|n| n.text().to_string()));
                                 let arguments = collect_args(&field, variables);
+
+                                // Extract loanId from input arguments if present
+                                let loan_id = extract_loan_id_from_args(&arguments);
+
                                 let selected_fields =
                                     collect_top_level_response_field_names(field.selection_set());
                                 calls.push(MutationCall {
                                     operation_name: op_name.clone(),
                                     field_name,
+                                    loan_id,
                                     alias,
                                     arguments,
                                     selected_fields,
@@ -257,16 +357,31 @@ mod tests {
         mock_service
             .expect_call()
             .returning(|req: supergraph::Request| {
+                // Return a response with data
+                let data = json!({
+                    "recordAutomatedSummary": {
+                        "LoanRequestID": "test-loan-123",
+                        "CreditScoreSummary": "credit score summary"
+                    }
+                });
                 Ok(supergraph::Response::fake_builder()
                     .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
                     .build()
                     .unwrap())
             });
         mock_service.expect_clone().return_once(|| {
             let mut inner = test::MockSupergraphService::new();
             inner.expect_call().returning(|req: supergraph::Request| {
+                let data = json!({
+                    "recordAutomatedSummary": {
+                        "LoanRequestID": "test-loan-123",
+                        "CreditScoreSummary": "credit score summary"
+                    }
+                });
                 Ok(supergraph::Response::fake_builder()
                     .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
                     .build()
                     .unwrap())
             });
@@ -279,6 +394,7 @@ mod tests {
             mutation RecordSummary {
               recordAutomatedSummary(
                 input: {
+                  loanId: "test-loan-123"
                   CreditScoreSummary: "credit score summary"
                   IncomeAndEmploymentSummary: "income"
                   LoanToIncomeSummary: "ratio"
@@ -287,12 +403,8 @@ mod tests {
                   SummarizedBy: "Analyst"
                   SummarizedAt: "2024-09-29T00:00:00Z"
                 }
-                metadata: {
-                  correlationId: "corr"
-                  causationId: "cause"
-                  transactionTimestamp: "2024-09-29T00:00:00Z"
-                }
               ) {
+                LoanRequestID
                 CreditScoreSummary
               }
             }
@@ -300,8 +412,11 @@ mod tests {
 
         let request = build_supergraph_request(mutation, json!({}));
 
-        let response = service.oneshot(request).await.unwrap();
+        let mut response = service.oneshot(request).await.unwrap();
         assert!(response.response.status().is_success());
+
+        // Consume the response stream to trigger the mutation persistence
+        while let Some(_) = response.response.body_mut().next().await {}
 
         let recorded = sink.recorded();
         assert_eq!(1, recorded.len());
@@ -318,6 +433,184 @@ mod tests {
             json!("credit score summary"),
             input.value["CreditScoreSummary"]
         );
+        // Verify response data was added
+        let response_data = call.arguments.iter().find(|arg| arg.name == "responseData");
+        assert!(response_data.is_some(), "Response data should be present");
+    }
+
+    #[tokio::test]
+    async fn extracts_loan_id_from_record_loan_requested_response() {
+        let sink = StdArc::new(MockMutationSink::default());
+        let interceptor = MutationInterceptor::with_sink(sink.clone());
+
+        let mut mock_service = test::MockSupergraphService::new();
+        mock_service
+            .expect_call()
+            .returning(|req: supergraph::Request| {
+                // Return a UUID as the loanId
+                let data = json!({
+                    "recordLoanRequested": "550e8400-e29b-41d4-a716-446655440000"
+                });
+                Ok(supergraph::Response::fake_builder()
+                    .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
+                    .build()
+                    .unwrap())
+            });
+        mock_service.expect_clone().return_once(|| {
+            let mut inner = test::MockSupergraphService::new();
+            inner.expect_call().returning(|req: supergraph::Request| {
+                let data = json!({
+                    "recordLoanRequested": "550e8400-e29b-41d4-a716-446655440000"
+                });
+                Ok(supergraph::Response::fake_builder()
+                    .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
+                    .build()
+                    .unwrap())
+            });
+            inner
+        });
+
+        let service = interceptor.supergraph_service(mock_service.boxed());
+
+        let mutation = r#"
+            mutation RecordLoan {
+              recordLoanRequested(
+                input: {
+                  Amount: 50000.0
+                  NationalID: "123456789"
+                  Name: "John Doe"
+                  Gender: "Male"
+                  Age: 35
+                  MaritalStatus: "Married"
+                  Dependents: 2
+                  EducationLevel: "Bachelor"
+                  EmployerName: "Tech Corp"
+                  JobTitle: "Engineer"
+                  JobSeniority: 5.0
+                  Income: 85000.0
+                  Address: {
+                    Street: "123 Main St"
+                    City: "San Francisco"
+                    Region: "CA"
+                    Country: "USA"
+                    PostalCode: "94102"
+                  }
+                  LoanRequestedTimestamp: "2024-09-29T00:00:00Z"
+                }
+              )
+            }
+        "#;
+
+        let request = build_supergraph_request(mutation, json!({}));
+
+        let mut response = service.oneshot(request).await.unwrap();
+        assert!(response.response.status().is_success());
+
+        // Consume the response stream to trigger the mutation persistence
+        while let Some(_) = response.response.body_mut().next().await {}
+
+        let recorded = sink.recorded();
+        assert_eq!(1, recorded.len());
+        let calls = &recorded[0];
+        assert_eq!(1, calls.len());
+        let call = &calls[0];
+        assert_eq!("recordLoanRequested", call.field_name);
+
+        // Verify loanId was extracted from response and set at top level
+        assert!(
+            call.loan_id.is_some(),
+            "loanId should be extracted from response"
+        );
+        assert_eq!(
+            "550e8400-e29b-41d4-a716-446655440000",
+            call.loan_id.as_ref().unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn extracts_loan_id_from_input_arguments() {
+        let sink = StdArc::new(MockMutationSink::default());
+        let interceptor = MutationInterceptor::with_sink(sink.clone());
+
+        let mut mock_service = test::MockSupergraphService::new();
+        mock_service
+            .expect_call()
+            .returning(|req: supergraph::Request| {
+                let data = json!({
+                    "recordCreditChecked": {
+                        "LoanRequestID": "test-loan-456",
+                        "NationalID": "123456789",
+                        "Score": 750,
+                        "CreditCheckedTimestamp": "2024-09-29T00:00:00Z"
+                    }
+                });
+                Ok(supergraph::Response::fake_builder()
+                    .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
+                    .build()
+                    .unwrap())
+            });
+        mock_service.expect_clone().return_once(|| {
+            let mut inner = test::MockSupergraphService::new();
+            inner.expect_call().returning(|req: supergraph::Request| {
+                let data = json!({
+                    "recordCreditChecked": {
+                        "LoanRequestID": "test-loan-456",
+                        "NationalID": "123456789",
+                        "Score": 750,
+                        "CreditCheckedTimestamp": "2024-09-29T00:00:00Z"
+                    }
+                });
+                Ok(supergraph::Response::fake_builder()
+                    .context(req.context)
+                    .data(serde_json_bytes::to_value(data).unwrap())
+                    .build()
+                    .unwrap())
+            });
+            inner
+        });
+
+        let service = interceptor.supergraph_service(mock_service.boxed());
+
+        let mutation = r#"
+            mutation CheckCredit {
+              recordCreditChecked(
+                input: {
+                  loanId: "test-loan-456"
+                  NationalID: "123456789"
+                  Score: 750
+                  CreditCheckedTimestamp: "2024-09-29T00:00:00Z"
+                }
+              ) {
+                LoanRequestID
+                Score
+              }
+            }
+        "#;
+
+        let request = build_supergraph_request(mutation, json!({}));
+
+        let mut response = service.oneshot(request).await.unwrap();
+        assert!(response.response.status().is_success());
+
+        // Consume the response stream to trigger the mutation persistence
+        while let Some(_) = response.response.body_mut().next().await {}
+
+        let recorded = sink.recorded();
+        assert_eq!(1, recorded.len());
+        let calls = &recorded[0];
+        assert_eq!(1, calls.len());
+        let call = &calls[0];
+        assert_eq!("recordCreditChecked", call.field_name);
+
+        // Verify loanId was extracted from input arguments and set at top level
+        assert!(
+            call.loan_id.is_some(),
+            "loanId should be extracted from input arguments"
+        );
+        assert_eq!("test-loan-456", call.loan_id.as_ref().unwrap());
     }
 
     #[tokio::test]

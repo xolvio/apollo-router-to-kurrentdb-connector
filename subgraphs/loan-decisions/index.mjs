@@ -12,27 +12,11 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    recordLoanApprovalNeeded(input: LoanApprovalNeededInput!, metadata: EventMetadataInput!): LoanApprovalNeededEvent!
-    recordLoanAutomaticallyApproved(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyApprovedEvent!
-    recordLoanAutomaticallyDenied(input: LoanAutomatedDecisionInput!, metadata: EventMetadataInput!): LoanAutomaticallyDeniedEvent!
-    recordLoanManuallyApproved(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyApprovedEvent!
-    recordLoanManuallyDenied(input: LoanManualDecisionInput!, metadata: EventMetadataInput!): LoanManuallyDeniedEvent!
-  }
-
-  interface LoanApplicationEvent {
-    metadata: EventMetadata!
-  }
-
-  type EventMetadata @shareable {
-    correlationId: ID!
-    causationId: ID!
-    transactionTimestamp: String!
-  }
-
-  input EventMetadataInput {
-    correlationId: ID!
-    causationId: ID!
-    transactionTimestamp: String!
+    recordLoanApprovalNeeded(input: LoanApprovalNeededInput!): LoanApprovalNeededEvent!
+    recordLoanAutomaticallyApproved(input: LoanAutomatedDecisionInput!): LoanAutomaticallyApprovedEvent!
+    recordLoanAutomaticallyDenied(input: LoanAutomatedDecisionInput!): LoanAutomaticallyDeniedEvent!
+    recordLoanManuallyApproved(input: LoanManualDecisionInput!): LoanManuallyApprovedEvent!
+    recordLoanManuallyDenied(input: LoanManualDecisionInput!): LoanManuallyDeniedEvent!
   }
 
   type LoanDecisionEvents {
@@ -45,50 +29,45 @@ const typeDefs = gql`
 
   union LoanDecisionEvent = LoanApprovalNeededEvent | LoanAutomaticallyApprovedEvent | LoanAutomaticallyDeniedEvent | LoanManuallyApprovedEvent | LoanManuallyDeniedEvent
 
-  type LoanApprovalNeededEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type LoanApprovalNeededEvent {
     LoanRequestID: ID!
     LoanAutomatedDecisionTimestamp: String!
   }
 
   input LoanApprovalNeededInput {
+    loanId: ID!
+    LoanAutomatedDecisionTimestamp: String!
+  }
+
+  type LoanAutomaticallyApprovedEvent {
     LoanRequestID: ID!
     LoanAutomatedDecisionTimestamp: String!
   }
 
-  type LoanAutomaticallyApprovedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
-    LoanRequestID: ID!
-    LoanAutomatedDecisionTimestamp: String!
-  }
-
-  type LoanAutomaticallyDeniedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type LoanAutomaticallyDeniedEvent {
     LoanRequestID: ID!
     LoanAutomatedDecisionTimestamp: String!
   }
 
   input LoanAutomatedDecisionInput {
-    LoanRequestID: ID!
+    loanId: ID!
     LoanAutomatedDecisionTimestamp: String!
   }
 
-  type LoanManuallyApprovedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type LoanManuallyApprovedEvent {
     LoanRequestID: ID!
     ApproverName: String!
     LoanManualDecisionTimestamp: String!
   }
 
-  type LoanManuallyDeniedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type LoanManuallyDeniedEvent {
     LoanRequestID: ID!
     ApproverName: String!
     LoanManualDecisionTimestamp: String!
   }
 
   input LoanManualDecisionInput {
-    LoanRequestID: ID!
+    loanId: ID!
     ApproverName: String!
     LoanManualDecisionTimestamp: String!
   }
@@ -109,18 +88,6 @@ const ensureRecord = (loanRequestId) => {
   return loanDecisionStore.get(loanRequestId);
 };
 
-const shareRecord = (primaryKey, secondaryKey, record) => {
-  if (secondaryKey && primaryKey !== secondaryKey) {
-    loanDecisionStore.set(secondaryKey, record);
-  }
-};
-
-const toMetadata = (input) => ({
-  correlationId: input.correlationId,
-  causationId: input.causationId,
-  transactionTimestamp: input.transactionTimestamp
-});
-
 const resolveDecisionType = (event) => event?.__typename ?? null;
 
 const resolvers = {
@@ -137,71 +104,56 @@ const resolvers = {
     }
   },
   Mutation: {
-    recordLoanApprovalNeeded: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanApprovalNeeded: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'LoanApprovalNeededEvent',
-        metadata: toMetadata(metadata),
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: input.loanId,
         LoanAutomatedDecisionTimestamp: input.LoanAutomatedDecisionTimestamp
       };
       record.approvalsNeeded.push(event);
-      shareRecord(key, input.LoanRequestID, record);
       return event;
     },
-    recordLoanAutomaticallyApproved: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanAutomaticallyApproved: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'LoanAutomaticallyApprovedEvent',
-        metadata: toMetadata(metadata),
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: input.loanId,
         LoanAutomatedDecisionTimestamp: input.LoanAutomatedDecisionTimestamp
       };
       record.automaticApprovals.push(event);
-      shareRecord(key, input.LoanRequestID, record);
       return event;
     },
-    recordLoanAutomaticallyDenied: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanAutomaticallyDenied: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'LoanAutomaticallyDeniedEvent',
-        metadata: toMetadata(metadata),
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: input.loanId,
         LoanAutomatedDecisionTimestamp: input.LoanAutomatedDecisionTimestamp
       };
       record.automaticDenials.push(event);
-      shareRecord(key, input.LoanRequestID, record);
       return event;
     },
-    recordLoanManuallyApproved: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanManuallyApproved: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'LoanManuallyApprovedEvent',
-        metadata: toMetadata(metadata),
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: input.loanId,
         ApproverName: input.ApproverName,
         LoanManualDecisionTimestamp: input.LoanManualDecisionTimestamp
       };
       record.manualApprovals.push(event);
-      shareRecord(key, input.LoanRequestID, record);
       return event;
     },
-    recordLoanManuallyDenied: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanManuallyDenied: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'LoanManuallyDeniedEvent',
-        metadata: toMetadata(metadata),
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: input.loanId,
         ApproverName: input.ApproverName,
         LoanManualDecisionTimestamp: input.LoanManualDecisionTimestamp
       };
       record.manualDenials.push(event);
-      shareRecord(key, input.LoanRequestID, record);
       return event;
     }
   },
@@ -211,9 +163,6 @@ const resolvers = {
     automaticDenials: (parent) => parent.automaticDenials ?? [],
     manualApprovals: (parent) => parent.manualApprovals ?? [],
     manualDenials: (parent) => parent.manualDenials ?? []
-  },
-  LoanApplicationEvent: {
-    __resolveType: resolveDecisionType
   },
   LoanDecisionEvent: {
     __resolveType: resolveDecisionType

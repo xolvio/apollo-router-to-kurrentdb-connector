@@ -2,6 +2,7 @@ import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { buildSubgraphSchema } from '@apollo/subgraph';
 import gql from 'graphql-tag';
+import { randomUUID } from 'crypto';
 
 const typeDefs = gql`
   extend schema
@@ -12,25 +13,9 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    recordLoanRequested(input: LoanRequestedInput!, metadata: EventMetadataInput!): LoanRequestedEvent!
-    recordCreditChecked(input: CreditCheckedInput!, metadata: EventMetadataInput!): CreditCheckedEvent!
-    recordAutomatedSummary(input: AutomatedSummaryInput!, metadata: EventMetadataInput!): AutomatedSummaryEvent!
-  }
-
-  interface LoanApplicationEvent {
-    metadata: EventMetadata!
-  }
-
-  type EventMetadata @shareable {
-    correlationId: ID!
-    causationId: ID!
-    transactionTimestamp: String!
-  }
-
-  input EventMetadataInput {
-    correlationId: ID!
-    causationId: ID!
-    transactionTimestamp: String!
+    recordLoanRequested(input: LoanRequestedInput!): ID!
+    recordCreditChecked(input: CreditCheckedInput!): CreditCheckedEvent!
+    recordAutomatedSummary(input: AutomatedSummaryInput!): AutomatedSummaryEvent!
   }
 
   type LoanOriginationEvents {
@@ -57,8 +42,7 @@ const typeDefs = gql`
     PostalCode: String!
   }
 
-  type LoanRequestedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type LoanRequestedEvent {
     Amount: Float!
     LoanRequestID: ID!
     NationalID: String!
@@ -79,7 +63,6 @@ const typeDefs = gql`
 
   input LoanRequestedInput {
     Amount: Float!
-    LoanRequestID: ID!
     NationalID: String!
     Name: String!
     Gender: String!
@@ -96,21 +79,22 @@ const typeDefs = gql`
     LoanProductID: Int
   }
 
-  type CreditCheckedEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type CreditCheckedEvent {
+    LoanRequestID: ID!
     NationalID: String!
     Score: Int!
     CreditCheckedTimestamp: String!
   }
 
   input CreditCheckedInput {
+    loanId: ID!
     NationalID: String!
     Score: Int!
     CreditCheckedTimestamp: String!
   }
 
-  type AutomatedSummaryEvent implements LoanApplicationEvent {
-    metadata: EventMetadata!
+  type AutomatedSummaryEvent {
+    LoanRequestID: ID!
     CreditScoreSummary: String!
     IncomeAndEmploymentSummary: String!
     LoanToIncomeSummary: String!
@@ -121,6 +105,7 @@ const typeDefs = gql`
   }
 
   input AutomatedSummaryInput {
+    loanId: ID!
     CreditScoreSummary: String!
     IncomeAndEmploymentSummary: String!
     LoanToIncomeSummary: String!
@@ -144,18 +129,6 @@ const ensureRecord = (loanRequestId) => {
   return loanOriginationStore.get(loanRequestId);
 };
 
-const shareRecord = (primaryKey, secondaryKey, record) => {
-  if (secondaryKey && primaryKey !== secondaryKey) {
-    loanOriginationStore.set(secondaryKey, record);
-  }
-};
-
-const toMetadata = (input) => ({
-  correlationId: input.correlationId,
-  causationId: input.causationId,
-  transactionTimestamp: input.transactionTimestamp
-});
-
 const resolveOriginationType = (event) => event?.__typename ?? null;
 
 const resolvers = {
@@ -170,14 +143,13 @@ const resolvers = {
     }
   },
   Mutation: {
-    recordLoanRequested: (_, { input, metadata }) => {
-      const key = metadata.correlationId ?? input.LoanRequestID;
-      const record = ensureRecord(key);
+    recordLoanRequested: (_, { input }) => {
+      const loanId = randomUUID();
+      const record = ensureRecord(loanId);
       const event = {
         __typename: 'LoanRequestedEvent',
-        metadata: toMetadata(metadata),
         Amount: input.Amount,
-        LoanRequestID: input.LoanRequestID,
+        LoanRequestID: loanId,
         NationalID: input.NationalID,
         Name: input.Name,
         Gender: input.Gender,
@@ -194,15 +166,13 @@ const resolvers = {
         LoanProductID: input.LoanProductID ?? null
       };
       record.loanRequested = event;
-      shareRecord(key, input.LoanRequestID, record);
-      return event;
+      return loanId;
     },
-    recordCreditChecked: (_, { input, metadata }) => {
-      const key = metadata.correlationId;
-      const record = ensureRecord(key);
+    recordCreditChecked: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'CreditCheckedEvent',
-        metadata: toMetadata(metadata),
+        LoanRequestID: input.loanId,
         NationalID: input.NationalID,
         Score: input.Score,
         CreditCheckedTimestamp: input.CreditCheckedTimestamp
@@ -210,12 +180,11 @@ const resolvers = {
       record.creditChecks.push(event);
       return event;
     },
-    recordAutomatedSummary: (_, { input, metadata }) => {
-      const key = metadata.correlationId;
-      const record = ensureRecord(key);
+    recordAutomatedSummary: (_, { input }) => {
+      const record = ensureRecord(input.loanId);
       const event = {
         __typename: 'AutomatedSummaryEvent',
-        metadata: toMetadata(metadata),
+        LoanRequestID: input.loanId,
         CreditScoreSummary: input.CreditScoreSummary,
         IncomeAndEmploymentSummary: input.IncomeAndEmploymentSummary,
         LoanToIncomeSummary: input.LoanToIncomeSummary,
@@ -231,9 +200,6 @@ const resolvers = {
   LoanOriginationEvents: {
     creditChecks: (parent) => parent.creditChecks ?? [],
     automatedSummaries: (parent) => parent.automatedSummaries ?? []
-  },
-  LoanApplicationEvent: {
-    __resolveType: resolveOriginationType
   },
   LoanOriginationEvent: {
     __resolveType: resolveOriginationType

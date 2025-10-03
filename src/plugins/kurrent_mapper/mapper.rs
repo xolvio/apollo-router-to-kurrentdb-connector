@@ -1,7 +1,7 @@
 use kurrentdb::{Client, ClientSettings, EventData};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::{Map, Value};
 use std::{io, sync::Arc};
 use tokio::task;
 use tower::BoxError;
@@ -13,6 +13,28 @@ pub struct MutationArg {
     pub value: Value,
 }
 
+fn serialize_arguments_as_map<S>(args: &Vec<MutationArg>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let map: Map<String, Value> = args
+        .iter()
+        .map(|arg| (arg.name.clone(), arg.value.clone()))
+        .collect();
+    map.serialize(serializer)
+}
+
+fn deserialize_arguments_from_map<'de, D>(deserializer: D) -> Result<Vec<MutationArg>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let map = Map::<String, Value>::deserialize(deserializer)?;
+    Ok(map
+        .into_iter()
+        .map(|(name, value)| MutationArg { name, value })
+        .collect())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationCall {
     pub operation_name: Option<String>,
@@ -20,6 +42,10 @@ pub struct MutationCall {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub loan_id: Option<String>,
     pub alias: Option<String>,
+    #[serde(
+        serialize_with = "serialize_arguments_as_map",
+        deserialize_with = "deserialize_arguments_from_map"
+    )]
     pub arguments: Vec<MutationArg>,
     pub selected_fields: Vec<String>,
 }

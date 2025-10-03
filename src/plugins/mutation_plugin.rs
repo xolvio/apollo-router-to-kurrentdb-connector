@@ -71,10 +71,13 @@ impl Plugin for MutationInterceptor {
             })
             .map_future_with_request_data(
                 |req: &supergraph::Request| {
-                    req.context
-                        .get::<_, Vec<MutationCall>>("pending_mutations")
-                        .ok()
-                        .flatten()
+                    let result = req.context.get::<_, Vec<MutationCall>>("pending_mutations");
+                    match &result {
+                        Ok(Some(calls)) => tracing::info!(count = calls.len(), "Retrieved pending_mutations from context"),
+                        Ok(None) => tracing::warn!("pending_mutations key exists but value is None"),
+                        Err(e) => tracing::error!(error = ?e, "Failed to deserialize pending_mutations from context"),
+                    }
+                    result.ok().flatten()
                 },
                 move |pending_calls: Option<Vec<MutationCall>>, fut| {
                     let mutation_sink = mutation_sink.clone();

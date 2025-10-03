@@ -51,11 +51,7 @@ with inputs:
     "RecommendedFurtherInvestigation": "no further invstigation",
     "SummarizedAt": "1758982243380",
     "SummarizedBy": "Billy"
-  },
-  "metadata": {
-    "causationId": "cuasation1123",
-    "correlationId": "correlation312",
-    "transactionTimestamp":"1758982243380" 
+    "loanId": "123"
   }
 }
 ```
